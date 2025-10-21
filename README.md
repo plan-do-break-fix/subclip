@@ -1,9 +1,9 @@
 # Subclip Random Cuts
 
-`randcuts.py` is a small command-line tool for building a single audio file from random
-segments of a source track. You provide the source file and a set of desired clip
-lengths, and the script stitches together faded clips chosen from random starting
-positions.
+`randcuts.py` is a small command-line tool and importable helper for building a single
+audio file from random segments of a source track. You provide the source file and a set
+of desired clip lengths, and the script stitches together faded clips chosen from random
+starting positions.
 
 ## Requirements
 
@@ -32,6 +32,21 @@ positions.
    1.25, and 2.0 seconds, applies short fade-in/out transitions, and exports the
    concatenated result to `mixed.wav`.
 
+   To use the same functionality from Python code, import
+   `randcuts.generate_random_cuts` and pass it an audio path and a list of durations:
+
+   ```python
+   from randcuts import generate_random_cuts
+
+   result = generate_random_cuts("path/to/source.wav", [3.5, 1.25, 2.0], seed=42)
+   print(len(result.concatenated))  # total duration in milliseconds
+   for clip in result.metadata:
+       print(clip.index, clip.start_ms, clip.duration_ms)
+
+   # Export the concatenated audio later, or set output_path in the call above.
+   result.export("mixed.wav")
+   ```
+
 ## Usage
 
 ```bash
@@ -46,4 +61,9 @@ python randcuts.py SRC_PATH DURATION [DURATION ...] [--seed SEED] [--out OUT]
 
 The script prints metadata for each generated clip, including its index, duration,
 random start position, and applied fade length.
+
+When called programmatically, `generate_random_cuts` returns a
+`RandomCutsResult`. It contains the original `AudioSegment`, the concatenated
+segment, and the metadata for each clip. Call `result.export(path)` to write the output
+to disk.
 

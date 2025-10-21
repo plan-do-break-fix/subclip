@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 
 import pytest
 
@@ -60,3 +61,52 @@ def test_build_random_clips_concatenation_rejects_duration_longer_than_source():
 
     with pytest.raises(ValueError):
         randcuts.build_random_clips_concatenation(source, [2.0], rng)
+
+
+def test_generate_random_cuts_returns_result(monkeypatch):
+    source = make_source(3000)
+
+    loaded_paths = []
+
+    def fake_load_audio(path: Path) -> AudioSegment:
+        loaded_paths.append(path)
+        return source
+
+    monkeypatch.setattr(randcuts, "load_audio", fake_load_audio)
+
+    result = randcuts.generate_random_cuts("dummy.wav", [0.5, 0.25, 0.125], seed=123)
+
+    assert loaded_paths == [Path("dummy.wav")]
+    assert result.source is source
+    assert len(result.metadata) == 3
+    assert sum(meta.duration_ms for meta in result.metadata) == len(result.concatenated)
+
+
+def test_generate_random_cuts_export_validates_suffix(monkeypatch, tmp_path):
+    source = make_source(1500)
+    monkeypatch.setattr(randcuts, "load_audio", lambda path: source)
+
+    with pytest.raises(ValueError):
+        randcuts.generate_random_cuts("dummy.wav", [0.5], output_path=tmp_path / "no_suffix")
+
+
+def test_random_cuts_result_export_invokes_audio_export(monkeypatch, tmp_path):
+    source = make_source(2000)
+    monkeypatch.setattr(randcuts, "load_audio", lambda path: source)
+
+    exported = {}
+
+    def fake_export(self, path: Path, format: str):
+        exported["path"] = path
+        exported["format"] = format
+        path.write_bytes(b"FAKE")
+
+    monkeypatch.setattr(randcuts.AudioSegment, "export", fake_export)
+
+    output_path = tmp_path / "clip.wav"
+    result = randcuts.generate_random_cuts("dummy.wav", [0.5], output_path=output_path)
+
+    assert exported["path"] == output_path
+    assert exported["format"] == "wav"
+    assert output_path.read_bytes() == b"FAKE"
+    assert len(result.metadata) == 1
